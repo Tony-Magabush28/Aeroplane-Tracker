@@ -1,0 +1,83 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<!-- Search Form -->
+<form method="POST" class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8">
+    <h2 class="text-lg font-semibold text-gray-800 mb-4 text-center">🔍 Track an Aircraft</h2>
+    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <input type="text" name="query" placeholder="e.g. 39C1F1 or AFR123" required
+               class="flex-1 px-4 py-3 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+        <button type="submit"
+                class="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition">
+            Search
+        </button>
+    </div>
+</form>
+
+{% if data %}
+<!-- Flight Info -->
+<div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-6 text-center">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4">✈️ Flight Information</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-700 text-left">
+        <div><strong>ICAO24:</strong> {{ data.icao24 }}</div>
+        <div><strong>Callsign:</strong> {{ data.callsign }}</div>
+        <div><strong>Origin Country:</strong> {{ data.origin_country }}</div>
+        <div><strong>Latitude:</strong> {{ data.latitude }}</div>
+        <div><strong>Longitude:</strong> {{ data.longitude }}</div>
+        <div><strong>Altitude:</strong> {{ data.altitude }} m</div>
+        <div><strong>Velocity:</strong> {{ data.velocity }} m/s</div>
+        <div><strong>Heading:</strong> {{ data.heading }}°</div>
+    </div>
+</div>
+
+<!-- Map Container -->
+<div class="bg-white p-2 rounded-lg shadow-md border border-gray-200 mb-10">
+    <div id="map" style="height: 500px;" class="w-full rounded-md"></div>
+</div>
+{% elif error %}
+<!-- Error Message -->
+<div class="bg-red-100 border border-red-300 text-red-700 p-4 rounded shadow-sm mb-6 text-center">
+    <strong>Error:</strong> {{ error }}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<!-- Leaflet CSS & JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+{% if data %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const flightData = JSON.parse('{{ data | tojson | safe }}');
+        const flightLat = flightData.latitude || 0;
+        const flightLng = flightData.longitude || 0;
+        const flightCallsign = flightData.callsign || "Unknown";
+        const flightIcao24 = flightData.icao24 || "N/A";
+
+        const map = L.map('map').setView([flightLat, flightLng], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        const marker = L.marker([flightLat, flightLng]).addTo(map)
+            .bindPopup(`${flightCallsign} (${flightIcao24})`).openPopup();
+
+        // Update marker every 15s
+        setInterval(() => {
+            fetch(`/flight-data?query=${flightIcao24}`)
+                .then(res => res.json())
+                .then(update => {
+                    if (update.latitude && update.longitude) {
+                        marker.setLatLng([update.latitude, update.longitude]);
+                        map.setView([update.latitude, update.longitude], 6);
+                        marker.getPopup().setContent(`${update.callsign} (${update.icao24})`);
+                    }
+                });
+        }, 15000);
+    });
+</script>
+{% endif %}
+{% endblock %}

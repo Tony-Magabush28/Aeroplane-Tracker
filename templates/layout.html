@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Aeroplane Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <style>
+        body {
+            background-image: url('https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1920&q=80');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center text-white">
+
+    <!-- Centered Glass Box -->
+    <div class="bg-black/60 backdrop-blur-lg p-10 rounded-xl shadow-xl w-full max-w-2xl text-center">
+
+        <!-- Header -->
+        <header class="mb-6">
+            <h1 class="text-4xl font-extrabold text-blue-300">
+                <i class="fas fa-plane-departure mr-2"></i> Aeroplane Tracker
+            </h1>
+            <nav class="mt-4 space-x-4 text-blue-200 text-lg">
+                <a href="/" class="hover:underline">Track Flight</a>
+                <a href="/map" class="hover:underline">Live Map</a>
+            </nav>
+        </header>
+
+        <!-- Main Content from Child Template -->
+        <main class="mt-6">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer class="mt-10 text-sm text-gray-300">
+            &copy; {{ now().year }} Aeroplane Tracker. All rights reserved.
+        </footer>
+    </div>
+
+    <!-- ✅ Allow child templates to insert scripts like Leaflet -->
+    {% block scripts %}{% endblock %}
+</body>
+</html>
