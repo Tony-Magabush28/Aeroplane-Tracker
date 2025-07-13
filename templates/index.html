@@ -65,7 +65,7 @@
         const marker = L.marker([flightLat, flightLng]).addTo(map)
             .bindPopup(`${flightCallsign} (${flightIcao24})`).openPopup();
 
-        // Update marker every 15s
+        // Auto-update marker every 15 seconds (optional feature for realism)
         setInterval(() => {
             fetch(`/flight-data?query=${flightIcao24}`)
                 .then(res => res.json())

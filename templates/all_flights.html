@@ -3,10 +3,24 @@
 {% block content %}
 <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">🌍 Live Global Air Traffic Map</h2>
 
+<div class="flex flex-col md:flex-row justify-center gap-4 mb-4">
+    <input id="callsignFilter" type="text" placeholder="Filter by Callsign..." class="p-2 rounded-md text-black text-sm">
+    <select id="countryFilter" class="p-2 rounded-md text-black text-sm">
+        <option value="">All Countries</option>
+        <option>Germany</option>
+        <option>United Kingdom</option>
+        <option>France</option>
+        <option>Spain</option>
+        <option>Italy</option>
+        <option>USA</option>
+    </select>
+    <button onclick="applyFilters()" class="bg-blue-500 hover:bg-blue-600 text-white py-1 px-4 rounded-md text-sm">Apply</button>
+    <button onclick="clearFilters()" class="bg-gray-500 hover:bg-gray-600 text-white py-1 px-4 rounded-md text-sm">Clear</button>
+</div>
+
 <div class="bg-white rounded-lg shadow-lg border border-gray-200 p-4 relative">
     <div id="map" class="w-full h-[600px] rounded-lg"></div>
 
-    <!-- Loading Spinner -->
     <div id="loading" class="absolute inset-0 bg-white bg-opacity-80 flex flex-col items-center justify-center z-10">
         <svg class="animate-spin h-8 w-8 text-blue-600 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none"
              viewBox="0 0 24 24">
@@ -17,15 +31,23 @@
     </div>
 </div>
 
-<!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-sA+e2UDTUiIRF3mI0O/2dxd6dkhOCi/hMmn5jwCbN7w=" crossorigin="" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-p9w+UcTg+ZKkMyt6IY1OdBGLvM0gJFrjAw4iQlG4bQA=" crossorigin=""></script>
+<p id="last-updated" class="text-xs text-gray-500 text-center mt-2"></p>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+<style>
+    .fade-in {
+        animation: fadeIn 1s ease forwards;
+        opacity: 0;
+    }
+    @keyframes fadeIn {
+        to { opacity: 1; }
+    }
+</style>
 
 <script>
     const map = L.map('map').setView([20, 0], 2);
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 10,
         attribution: '&copy; OpenStreetMap contributors'
@@ -33,43 +55,88 @@
 
     let markers = [];
 
+    function updateTimestamp() {
+        document.getElementById('last-updated').textContent =
+            'Last updated: ' + new Date().toLocaleTimeString();
+    }
+
+    function createPlaneIcon(rotation) {
+        return L.divIcon({
+            html: `<div class="fade-in" style="transform: rotate(${rotation}deg); font-size: 20px;">✈️</div>`,
+            className: '',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+    }
+
+    function clearMarkers() {
+        markers.forEach(marker => map.removeLayer(marker));
+        markers = [];
+    }
+
+    async function fetchFlights() {
+        try {
+            const response = await fetch('/all-flights');
+            return await response.json();
+        } catch {
+            return [];
+        }
+    }
+
+    async function applyFilters() {
+        const callsignFilter = document.getElementById('callsignFilter').value.toUpperCase();
+        const countryFilter = document.getElementById('countryFilter').value.toUpperCase();
+        const loadingEl = document.getElementById('loading');
+        loadingEl.style.display = 'flex';
+
+        const data = await fetchFlights();
+        loadingEl.style.display = 'none';
+        clearMarkers();
+
+        if (!data || data.length === 0) {
+            loadingEl.innerHTML = `<p class="text-yellow-600 text-sm">No flight data available.</p>
+                                   <button onclick="applyFilters()" class="mt-2 text-blue-600 underline">Retry</button>`;
+            loadingEl.style.display = 'flex';
+            return;
+        }
+
+        data.forEach(flight => {
+            if (flight.latitude && flight.longitude) {
+                if (callsignFilter && !flight.callsign.toUpperCase().includes(callsignFilter)) return;
+                if (countryFilter && !flight.origin_country.toUpperCase().includes(countryFilter)) return;
+
+                const rotation = flight.heading || 0;
+                const icon = createPlaneIcon(rotation);
+
+                const marker = L.marker([flight.latitude, flight.longitude], { icon })
+                    .addTo(map)
+                    .bindPopup(`
+                        <strong>${flight.callsign || "N/A"}</strong><br>
+                        ICAO24: ${flight.icao24}<br>
+                        Country: ${flight.origin_country}<br>
+                        Altitude: ${flight.altitude ? flight.altitude.toFixed(0) + ' m' : 'N/A'}<br>
+                        Velocity: ${flight.velocity ? flight.velocity.toFixed(1) + ' m/s' : 'N/A'}
+                    `);
+                markers.push(marker);
+            }
+        });
+
+        updateTimestamp();
+    }
+
+    function clearFilters() {
+        document.getElementById('callsignFilter').value = '';
+        document.getElementById('countryFilter').selectedIndex = 0;
+        applyFilters();
+    }
+
     function loadFlights() {
-        fetch('/all-flights')
-            .then(response => response.json())
-            .then(data => {
-                console.log("Flight data received:", data);
-
-                const loadingEl = document.getElementById('loading');
-                if (data.length === 0) {
-                    loadingEl.innerHTML = `<p class="text-yellow-600 text-sm">No flight data available.</p>`;
-                    return;
-                }
-
-                loadingEl.style.display = 'none';
-                markers.forEach(marker => map.removeLayer(marker));
-                markers = [];
-
-                data.forEach(flight => {
-                    if (flight.latitude && flight.longitude) {
-                        const marker = L.marker([flight.latitude, flight.longitude])
-                            .addTo(map)
-                            .bindPopup(`
-                                <strong>${flight.callsign || "N/A"}</strong><br>
-                                ICAO24: ${flight.icao24}<br>
-                                Country: ${flight.origin_country}
-                            `);
-                        markers.push(marker);
-                    }
-                });
-            })
-            .catch(error => {
-                console.error("Error loading flights:", error);
-                document.getElementById('loading').innerHTML =
-                    `<p class="text-red-600 text-sm">Failed to load flight data.</p>`;
-            });
+        applyFilters();
     }
 
     loadFlights();
-    setInterval(loadFlights, 30000);
+    setInterval(applyFilters, 30000);
 </script>
 {% endblock %}
+
+
